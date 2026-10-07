@@ -1,0 +1,24 @@
+/***********************************************************************
+* This file is part of OpenMolcas.                                     *
+*                                                                      *
+* OpenMolcas is free software; you can redistribute it and/or modify   *
+* it under the terms of the GNU Lesser General Public License, v. 2.1. *
+* OpenMolcas is distributed in the hope that it will be useful, but it *
+* is provided "as is" and without any express or implied warranties.   *
+* For more details see the full text of the license in the file        *
+* LICENSE or in <http://www.gnu.org/licenses/>.                        *
+***********************************************************************/
+ (prgm)  "$MOLCAS"/bin/eda.exe                    executable
+ (file)  EDAINP   "$WorkDir/$Project."Eda.Input   rwi
+#include "aoints.inc"
+#include "orbitals.inc"
+ (file)  EDAFRG1  "$WorkDir/$Project."EdaFrag1    ro
+ (file)  EDAFRG2  "$WorkDir/$Project."EdaFrag2    ro
+ (file)  EDAFRG3  "$WorkDir/$Project."EdaFrag3    ro
+ (file)  EDAFRG4  "$WorkDir/$Project."EdaFrag4    ro
+ (file)  EDAFRG5  "$WorkDir/$Project."EdaFrag5    ro
+ (file)  EDAFRG6  "$WorkDir/$Project."EdaFrag6    ro
+ (file)  EDAFRG7  "$WorkDir/$Project."EdaFrag7    ro
+ (file)  EDAFRG8  "$WorkDir/$Project."EdaFrag8    ro
+ (file)  EDAFRG9  "$WorkDir/$Project."EdaFrag9    ro
+ (file)  EDAFR10  "$WorkDir/$Project."EdaFrag10   ro
