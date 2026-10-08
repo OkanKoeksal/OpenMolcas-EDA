@@ -7,6 +7,8 @@
 ! is provided "as is" and without any express or implied warranties.   *
 ! For more details see the full text of the license in the file        *
 ! LICENSE or in <http://www.gnu.org/licenses/>.                        *
+!                                                                      *
+! Copyright (C) 2026, Okan Koeksal                                     *
 !***********************************************************************
 
 module EDA_Reference
@@ -91,7 +93,7 @@ subroutine Read_Current_RunFile(Ref,ierr,Message)
 
   call Get_iScalar('nSym',nSym)
   if (nSym /= 1) then
-    Message = 'EDA stage 1 requires C1 (NoSym) references.'
+    Message = 'CMOEDA currently requires C1 (NoSym) references.'
     return
   end if
 
@@ -111,7 +113,7 @@ subroutine Read_Current_RunFile(Ref,ierr,Message)
   end if
 
   if ((Ref%Method /= 'RHF-SCF ') .and. (Ref%Method /= 'MBPT2   ')) then
-    Message = 'EDA stage 1 accepts only RHF-SCF or closed-shell MBPT2 references.'
+    Message = 'CMOEDA currently accepts only RHF-SCF or closed-shell MBPT2 references.'
     return
   end if
 

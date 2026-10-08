@@ -7,11 +7,14 @@
 # is provided "as is" and without any express or implied warranties.   *
 # For more details see the full text of the license in the file        *
 # LICENSE or in <http://www.gnu.org/licenses/>.                        *
+#                                                                      *
+# Copyright (C) 2026, Okan Koeksal                                     *
 #***********************************************************************
 
 set (sources
      main.F90
      eda_data.F90
+     eda_parallel.F90
      eda_input.F90
      eda_reference.F90
      eda_integrals.F90

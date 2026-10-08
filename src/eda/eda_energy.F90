@@ -7,12 +7,15 @@
 ! is provided "as is" and without any express or implied warranties.   *
 ! For more details see the full text of the license in the file        *
 ! LICENSE or in <http://www.gnu.org/licenses/>.                        *
+!                                                                      *
+! Copyright (C) 2026, Okan Koeksal                                     *
 !***********************************************************************
 
 module EDA_Energy
 
 use Definitions, only: wp, iwp
 use EDA_Reference, only: EDA_Reference_Type
+use EDA_Parallel, only: EDA_Any
 use EDA_Integrals, only: EDA_Read_OneElectron, EDA_TwoElectron_Energies
 
 implicit none
@@ -62,7 +65,7 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
 
   nBas = Super%nBas
   nOcc = Super%nOcc
-  if ((nBas < 1) .or. (nOcc < 1)) then
+  if (EDA_Any((nBas < 1) .or. (nOcc < 1))) then
     Message = 'Invalid supermolecule RHF dimensions.'
     return
   end if
@@ -73,19 +76,19 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
     nOccSum = nOccSum + Frag(iFrag)%nOcc
     nBasSum = nBasSum + Frag(iFrag)%nBas
   end do
-  if (nOccSum /= nOcc) then
+  if (EDA_Any(nOccSum /= nOcc)) then
     Message = 'Sum of fragment occupied orbitals differs from the supermolecule RHF occupation.'
     return
   end if
 
   if (trim(FragBasis) == 'OWN') then
-    if (nBasSum /= nBas) then
+    if (EDA_Any(nBasSum /= nBas)) then
       Message = 'FBASIS=OWN requires the sum of fragment AO dimensions to equal the supermolecule AO dimension.'
       return
     end if
   else if (trim(FragBasis) == 'SUPER') then
     do iFrag=1,nFrag
-      if (Frag(iFrag)%nBas /= nBas) then
+      if (EDA_Any(Frag(iFrag)%nBas /= nBas)) then
         Message = 'FBASIS=SUPER requires every fragment RunFile to use the full supermolecule AO basis.'
         return
       end if
@@ -144,7 +147,7 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
   allocate(Work(1))
   lWork = -1
   call DSYEV_('V','U',nOcc,OccS,nOcc,Eig,Work,lWork,info)
-  if (info /= 0) then
+  if (EDA_Any(info /= 0)) then
     Message = 'Failed to query the occupied-overlap diagonalization workspace.'
     goto 900
   end if
@@ -152,13 +155,13 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
   deallocate(Work)
   allocate(Work(lWork))
   call DSYEV_('V','U',nOcc,OccS,nOcc,Eig,Work,lWork,info)
-  if (info /= 0) then
+  if (EDA_Any(info /= 0)) then
     Message = 'Failed to diagonalize the occupied fragment-orbital overlap matrix.'
     goto 900
   end if
 
   OverlapMin = minval(Eig)
-  if (OverlapMin <= 1.0e-10_wp) then
+  if (EDA_Any(OverlapMin <= 1.0e-10_wp)) then
     Message = 'Fragment occupied orbitals are linearly dependent in the supermolecule overlap metric.'
     goto 900
   end if
