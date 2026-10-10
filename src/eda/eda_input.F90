@@ -16,7 +16,7 @@ subroutine EDA_Read_Input(iReturn)
 use Definitions, only: iwp, u5, u6
 use EDA_Data, only: EDA_MaxFrag, EDA_nFrag, EDA_nAtom, EDA_Charge, EDA_Mult, &
                     EDA_RefMethod, EDA_FragBasis, EDA_Debug, EDA_Reset_Input
-use EDA_Parallel, only: EDA_Is_Root
+use Para_Info, only: nProcs, MyRank, Is_Real_Par
 
 implicit none
 #include "warnings.h"
@@ -25,6 +25,9 @@ integer(kind=iwp), intent(out) :: iReturn
 integer(kind=iwp) :: i
 character(len=180) :: Line, Value
 character(len=180), external :: Get_Ln
+logical :: IsRoot
+
+IsRoot = (nProcs <= 1) .or. (.not. Is_Real_Par()) .or. (MyRank == 0)
 
 call EDA_Reset_Input()
 iReturn = _RC_INPUT_ERROR_
@@ -43,14 +46,14 @@ read_loop: do
       Line = Get_Ln(u5)
       call Get_I1(1,EDA_nFrag)
       if ((EDA_nFrag < 1) .or. (EDA_nFrag > EDA_MaxFrag)) then
-        if (EDA_Is_Root()) write(u6,'(6X,A,I0,A,I0,A)') 'EDA: NFRAG must be between 1 and ',EDA_MaxFrag, &
+        if (IsRoot) write(u6,'(6X,A,I0,A,I0,A)') 'EDA: NFRAG must be between 1 and ',EDA_MaxFrag, &
                                      '; received ',EDA_nFrag,'.'
         return
       end if
 
     case ('NATO')
       if (EDA_nFrag < 1) then
-        if (EDA_Is_Root()) write(u6,'(6X,A)') 'EDA: NFRAG must appear before NATOM.'
+        if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG must appear before NATOM.'
         return
       end if
       Line = Get_Ln(u5)
@@ -58,7 +61,7 @@ read_loop: do
 
     case ('CHAR')
       if (EDA_nFrag < 1) then
-        if (EDA_Is_Root()) write(u6,'(6X,A)') 'EDA: NFRAG must appear before CHARGE.'
+        if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG must appear before CHARGE.'
         return
       end if
       Line = Get_Ln(u5)
@@ -66,7 +69,7 @@ read_loop: do
 
     case ('MULT')
       if (EDA_nFrag < 1) then
-        if (EDA_Is_Root()) write(u6,'(6X,A)') 'EDA: NFRAG must appear before MULT.'
+        if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG must appear before MULT.'
         return
       end if
       Line = Get_Ln(u5)
@@ -96,36 +99,36 @@ read_loop: do
       exit read_loop
 
     case default
-      if (EDA_Is_Root()) write(u6,'(6X,2A)') 'EDA: unrecognized keyword: ',trim(Value)
+      if (IsRoot) write(u6,'(6X,2A)') 'EDA: unrecognized keyword: ',trim(Value)
       return
   end select
 end do read_loop
 
 if (EDA_nFrag < 1) then
-  if (EDA_Is_Root()) write(u6,'(6X,A)') 'EDA: NFRAG is required.'
+  if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG is required.'
   return
 end if
 if (any(EDA_nAtom(1:EDA_nFrag) <= 0)) then
-  if (EDA_Is_Root()) write(u6,'(6X,A)') 'EDA: NATOM must contain a positive atom count for every fragment.'
+  if (IsRoot) write(u6,'(6X,A)') 'EDA: NATOM must contain a positive atom count for every fragment.'
   return
 end if
 if (any(EDA_Mult(1:EDA_nFrag) /= 1)) then
-  if (EDA_Is_Root()) write(u6,'(6X,A)') 'CMOEDA currently supports only closed-shell singlet fragments (MULT=1).'
+  if (IsRoot) write(u6,'(6X,A)') 'CMOEDA currently supports only closed-shell singlet fragments (MULT=1).'
   return
 end if
 
 if ((trim(EDA_RefMethod) /= 'AUTO') .and. (trim(EDA_RefMethod) /= 'RHF') .and. &
     (trim(EDA_RefMethod) /= 'MBPT2')) then
-  if (EDA_Is_Root()) write(u6,'(6X,2A)') 'EDA: REFERENCE must be AUTO, RHF, or MBPT2; received ',trim(EDA_RefMethod)
+  if (IsRoot) write(u6,'(6X,2A)') 'EDA: REFERENCE must be AUTO, RHF, or MBPT2; received ',trim(EDA_RefMethod)
   return
 end if
 
 if ((trim(EDA_FragBasis) /= 'OWN') .and. (trim(EDA_FragBasis) /= 'SUPER')) then
-  if (EDA_Is_Root()) write(u6,'(6X,2A)') 'EDA: FBASIS must be OWN or SUPER; received ',trim(EDA_FragBasis)
+  if (IsRoot) write(u6,'(6X,2A)') 'EDA: FBASIS must be OWN or SUPER; received ',trim(EDA_FragBasis)
   return
 end if
 
-if (EDA_Debug .and. EDA_Is_Root()) then
+if (EDA_Debug .and. IsRoot) then
   write(u6,'(/,6X,A)') 'EDA input summary:'
   write(u6,'(8X,A,I0)') 'Number of fragments: ',EDA_nFrag
   write(u6,'(8X,A,10(I0,1X))') 'Atoms per fragment: ',(EDA_nAtom(i),i=1,EDA_nFrag)

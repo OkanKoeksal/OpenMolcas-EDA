@@ -14,6 +14,7 @@
 module EDA_Reference
 
 use Definitions, only: wp, iwp
+use Constants, only: Zero
 
 implicit none
 private
@@ -27,8 +28,8 @@ type, public :: EDA_Reference_Type
   integer(kind=iwp) :: nOrb = 0
   integer(kind=iwp) :: nOcc = 0
   integer(kind=iwp) :: nAtoms = 0
-  real(kind=wp) :: EHF = 0.0_wp
-  real(kind=wp) :: ETotal = 0.0_wp
+  real(kind=wp) :: EHF = Zero
+  real(kind=wp) :: ETotal = Zero
   logical :: HasMP2 = .false.
   character(len=8) :: Method = '        '
   real(kind=wp), allocatable :: COcc(:,:)
@@ -112,7 +113,7 @@ subroutine Read_Current_RunFile(Ref,ierr,Message)
     return
   end if
 
-  if ((Ref%Method /= 'RHF-SCF ') .and. (Ref%Method /= 'MBPT2   ')) then
+  if ((Ref%Method(1:7) /= 'RHF-SCF') .and. (Ref%Method(1:5) /= 'MBPT2')) then
     Message = 'CMOEDA currently accepts only RHF-SCF or closed-shell MBPT2 references.'
     return
   end if
@@ -135,7 +136,7 @@ subroutine Read_Current_RunFile(Ref,ierr,Message)
 
   call Get_dScalar('SCF energy',Ref%EHF)
   call Get_dScalar('Last energy',Ref%ETotal)
-  Ref%HasMP2 = (Ref%Method == 'MBPT2   ')
+  Ref%HasMP2 = (Ref%Method(1:5) == 'MBPT2')
   if (.not. Ref%HasMP2) Ref%ETotal = Ref%EHF
 
   ierr = 0
@@ -152,8 +153,8 @@ subroutine EDA_Free_Reference(Ref)
   Ref%nOrb = 0
   Ref%nOcc = 0
   Ref%nAtoms = 0
-  Ref%EHF = 0.0_wp
-  Ref%ETotal = 0.0_wp
+  Ref%EHF = Zero
+  Ref%ETotal = Zero
   Ref%HasMP2 = .false.
   Ref%Method = '        '
 

@@ -14,10 +14,10 @@
 subroutine EDA(iReturn)
 
 use Definitions, only: wp, iwp, u6
-use Constants, only: auTokcalmol
-use Para_Info, only: nProcs
+use Constants, only: auTokcalmol, Zero
+use Para_Info, only: nProcs, MyRank, Is_Real_Par
 use EDA_Data, only: EDA_nFrag, EDA_nAtom, EDA_RefMethod, EDA_FragBasis
-use EDA_Parallel, only: EDA_Is_Root, EDA_Any, EDA_Sync_Error
+use EDA_Parallel, only: EDA_Sync_Error
 use EDA_Reference, only: EDA_Reference_Type, EDA_Read_Super, EDA_Read_Fragment, EDA_Free_Reference
 use EDA_Energy, only: EDA_Results_Type, EDA_Compute_ClosedShell
 
@@ -25,23 +25,32 @@ implicit none
 #include "warnings.h"
 
 integer(kind=iwp), intent(out) :: iReturn
-integer(kind=iwp) :: ierr, iFrag, nAtomsExpected
+integer(kind=iwp) :: ierr, iFrag, nAtomsExpected, AnyError
 character(len=256) :: Message
 type(EDA_Reference_Type) :: Super
 type(EDA_Reference_Type), allocatable :: Frag(:)
 type(EDA_Results_Type) :: Results
+logical :: IsRoot, IsParallel
+
+IsParallel = (nProcs > 1) .and. Is_Real_Par()
+IsRoot = (.not. IsParallel) .or. (MyRank == 0)
 
 call EDA_Read_Input(ierr)
-if (EDA_Any(ierr /= _RC_ALL_IS_WELL_)) then
+AnyError = 0
+if (ierr /= _RC_ALL_IS_WELL_) AnyError = 1
+if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+if (AnyError /= 0) then
   iReturn = _RC_INPUT_ERROR_
   return
 end if
+
+processing: do
 
 allocate(Frag(EDA_nFrag))
 
 call EDA_Read_Super(Super,ierr,Message)
 call EDA_Sync_Error(ierr,Message)
-if (ierr /= 0) goto 900
+if (ierr /= 0) exit processing
 
 nAtomsExpected = sum(EDA_nAtom(1:EDA_nFrag))
 if (Super%nAtoms /= nAtomsExpected) then
@@ -52,7 +61,7 @@ else
   ierr = 0
 end if
 call EDA_Sync_Error(ierr,Message)
-if (ierr /= 0) goto 900
+if (ierr /= 0) exit processing
 
 if ((trim(EDA_RefMethod) == 'RHF') .and. (Super%Method /= 'RHF-SCF ')) then
   Message = 'REFERENCE=RHF requires the current supermolecule RunFile to end at RHF-SCF.'
@@ -64,7 +73,7 @@ else
   ierr = 0
 end if
 call EDA_Sync_Error(ierr,Message)
-if (ierr /= 0) goto 900
+if (ierr /= 0) exit processing
 
 fragment_loop: do iFrag=1,EDA_nFrag
   call EDA_Read_Fragment(iFrag,Frag(iFrag),ierr,Message)
@@ -80,22 +89,22 @@ fragment_loop: do iFrag=1,EDA_nFrag
   call EDA_Sync_Error(ierr,Message)
   if (ierr /= 0) exit fragment_loop
 end do fragment_loop
-if (ierr /= 0) goto 900
+if (ierr /= 0) exit processing
 
 call EDA_Compute_ClosedShell(Super,Frag,EDA_nFrag,EDA_FragBasis,Results,ierr,Message)
 call EDA_Sync_Error(ierr,Message)
-if (ierr /= 0) goto 900
+if (ierr /= 0) exit processing
 
-if (EDA_Is_Root()) call PrintResults(Super,Frag,EDA_nFrag,Results)
+if (IsRoot) call PrintResults(Super,Frag,EDA_nFrag,Results)
 
 iReturn = _RC_ALL_IS_WELL_
-goto 990
+exit processing
+end do processing
 
-900 continue
-if (EDA_Is_Root()) write(u6,'(/,6X,2A)') 'CMOEDA failed: ',trim(Message)
-iReturn = _RC_GENERAL_ERROR_
-
-990 continue
+if (ierr /= 0) then
+  if (IsRoot) write(u6,'(/,6X,2A)') 'CMOEDA failed: ',trim(Message)
+  iReturn = _RC_GENERAL_ERROR_
+end if
 call EDA_Free_Reference(Super)
 do iFrag=1,size(Frag)
   call EDA_Free_Reference(Frag(iFrag))
@@ -113,7 +122,7 @@ subroutine PrintResults(SuperRef,FragRef,nFrag,Res)
   integer(kind=iwp) :: i
   real(kind=wp) :: SumEHF
 
-  SumEHF = 0.0_wp
+  SumEHF = Zero
   do i=1,nFrag
     SumEHF = SumEHF + FragRef(i)%EHF
   end do

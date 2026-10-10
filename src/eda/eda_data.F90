@@ -35,9 +35,9 @@ contains
 subroutine EDA_Reset_Input()
 
   EDA_nFrag = 0
-  EDA_nAtom = 0
-  EDA_Charge = 0
-  EDA_Mult = 1
+  EDA_nAtom(:) = 0
+  EDA_Charge(:) = 0
+  EDA_Mult(:) = 1
   EDA_RefMethod = 'AUTO    '
   EDA_FragBasis = 'OWN     '
   EDA_Debug = .false.

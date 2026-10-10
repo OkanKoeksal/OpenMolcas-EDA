@@ -14,7 +14,9 @@
 module EDA_Integrals
 
 use Definitions, only: wp, iwp
-use EDA_Parallel, only: EDA_Is_Parallel, EDA_Is_Root, EDA_Any
+use Index_Functions, only: nTri_Elem
+use Constants, only: Zero
+use Para_Info, only: nProcs, MyRank, Is_Real_Par
 
 implicit none
 private
@@ -32,26 +34,28 @@ subroutine EDA_Read_OneElectron(nBas,H,S,Enuc,ierr,Message)
   integer(kind=iwp), intent(out) :: ierr
   character(len=*), intent(out) :: Message
 
-  integer(kind=iwp) :: nPair, rc, CloseRC, iOpt, iComp, iSym, LuOne
-  logical :: Opened, Failed
+  integer(kind=iwp) :: nPair, rc, CloseRC, iOpt, iComp, iSym, LuOne, AnyError
+  logical :: Opened, Failed, IsParallel
   character(len=8) :: Label
   real(kind=wp), allocatable :: Buf(:)
 
+  IsParallel = (nProcs > 1) .and. Is_Real_Par()
+
   ierr = 0
   Message = ''
-  H = 0.0_wp
-  S = 0.0_wp
-  Enuc = 0.0_wp
+  H(:,:) = Zero
+  S(:,:) = Zero
+  Enuc = Zero
   Opened = .false.
   rc = 0
   CloseRC = 0
   LuOne = 41
-  nPair = nBas*(nBas+1)/2
+  nPair = nTri_Elem(nBas)
 
   ! ONEINT access is local in the Molcas reader layer.  Read the complete
   ! one-electron data only on rank 0 and broadcast it by a global sum from
   ! zero-filled arrays on the remaining ranks.
-  if (EDA_Is_Root()) then
+  if ((.not. IsParallel .or. MyRank == 0)) then
     allocate(Buf(nPair+4))
 
     call OpnOne(rc,0,'ONEINT',LuOne)
@@ -63,12 +67,12 @@ subroutine EDA_Read_OneElectron(nBas,H,S,Enuc,ierr,Message)
 
       Label = 'OneHam  '
       call RdOne(rc,iOpt,Label,iComp,Buf,iSym)
-      if (rc == 0) call UnpackSymmetric(Buf,H,nBas)
+      if (rc == 0) call Square(Buf,H,nBas,1,nBas)
 
       if (rc == 0) then
         Label = 'Mltpl  0'
         call RdOne(rc,iOpt,Label,iComp,Buf,iSym)
-        if (rc == 0) call UnpackSymmetric(Buf,S,nBas)
+        if (rc == 0) call Square(Buf,S,nBas,1,nBas)
       end if
 
       if (rc == 0) call Get_dScalar('PotNuc',Enuc)
@@ -83,7 +87,10 @@ subroutine EDA_Read_OneElectron(nBas,H,S,Enuc,ierr,Message)
   end if
 
   Failed = (rc /= 0)
-  if (EDA_Any(Failed)) then
+  AnyError = 0
+  if (Failed) AnyError = 1
+  if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+  if (AnyError /= 0) then
     ierr = 1
     if (Failed) then
       Message = 'Unable to read ONEINT for CMOEDA.'
@@ -93,7 +100,7 @@ subroutine EDA_Read_OneElectron(nBas,H,S,Enuc,ierr,Message)
     return
   end if
 
-  if (EDA_Is_Parallel()) then
+  if (IsParallel) then
     call GADGOp(H(1,1),nBas*nBas,'+')
     call GADGOp(S(1,1),nBas*nBas,'+')
     call GADGOp_SCAL(Enuc,'+')
@@ -112,48 +119,61 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   integer(kind=iwp), intent(out) :: ierr
   character(len=*), intent(out) :: Message
 
-  integer(kind=iwp) :: nPair, rc, CloseRC, LuOrd
+  integer(kind=iwp) :: nPair, rc, CloseRC, LuOrd, AnyError
   integer(kind=iwp) :: FileNSym, FileBas(8), FileSkip(8)
   integer(kind=iwp) :: i,j,k,l,q,nMat,iOpt,iFrag
   integer(kind=iwp) :: mij,mkl
   logical(kind=iwp) :: Exists, Square
-  logical :: Opened, Failed
+  logical :: Opened, Failed, IsParallel
   real(kind=wp) :: v, JFactor
   real(kind=wp), allocatable :: Buf(:), Totals(:)
 
+  IsParallel = (nProcs > 1) .and. Is_Real_Par()
+
   ierr = 1
   Message = 'Unable to read conventional two-electron integrals for CMOEDA.'
-  Jraw = 0.0_wp
-  Kraw = 0.0_wp
-  Jorth = 0.0_wp
-  Korth = 0.0_wp
-  Kfrag = 0.0_wp
+  Jraw = Zero
+  Kraw = Zero
+  Jorth = Zero
+  Korth = Zero
+  Kfrag(:) = Zero
   Opened = .false.
   rc = 0
   CloseRC = 0
   LuOrd = 43
-  nPair = nBas*(nBas+1)/2
+  nPair = nTri_Elem(nBas)
 
   call f_Inquire('ORDINT',Exists)
-  if (EDA_Any(.not. logical(Exists))) then
+  AnyError = 0
+  if (.not. logical(Exists)) AnyError = 1
+  if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+  if (AnyError /= 0) then
     Message = 'CMOEDA requires stored ORDINT integrals: use &SEWARD with NoCholesky.'
     return
   end if
 
   allocate(Buf(nPair+1))
+  reading: do
+
   call OpnOrd(rc,0,'ORDINT',LuOrd)
   if (rc == 0) Opened = .true.
-  if (EDA_Any(rc /= 0)) then
+  AnyError = 0
+  if (rc /= 0) AnyError = 1
+  if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+  if (AnyError /= 0) then
     Message = 'Unable to open conventional ORDINT integrals for CMOEDA.'
-    goto 900
+    exit reading
   end if
 
   call GetOrd(rc,Square,FileNSym,FileBas,FileSkip)
   Failed = (rc /= 0)
   if (.not. Failed) Failed = (FileNSym /= 1) .or. (FileBas(1) /= nBas) .or. (FileSkip(1) /= 0)
-  if (EDA_Any(Failed)) then
+  AnyError = 0
+  if (Failed) AnyError = 1
+  if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+  if (AnyError /= 0) then
     Message = 'ORDINT dimensions do not match the C1 CMOEDA supermolecule reference.'
-    goto 900
+    exit reading
   end if
 
   ! In a real MPI run ORDINT is distributed over the ranks.  Unlike an
@@ -164,15 +184,18 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   iOpt = 1
   do i=1,nBas
     do j=1,i
-      Buf = 0.0_wp
+      Buf(:) = Zero
       rc = 0
       nMat = 0
       call RdOrd_(rc,iOpt,1,1,1,1,Buf,nPair+1,nMat)
       iOpt = 2
       Failed = (rc /= 0) .or. (nMat /= 1)
-      if (EDA_Any(Failed)) then
+      AnyError = 0
+      if (Failed) AnyError = 1
+      if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+      if (AnyError /= 0) then
         Message = 'Failed to read a complete conventional ORDINT pair row for CMOEDA.'
-        goto 900
+        exit reading
       end if
 
       if (i == j) then
@@ -186,7 +209,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
         do l=1,k
           q = q+1
           v = Buf(q)
-          if (v == 0.0_wp) cycle
+          if (v == Zero) cycle
 
           if (k == l) then
             mkl = 1
@@ -214,12 +237,15 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
     Opened = .false.
     if (CloseRC /= 0) rc = CloseRC
   end if
-  if (EDA_Any(rc /= 0)) then
+  AnyError = 0
+  if (rc /= 0) AnyError = 1
+  if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+  if (AnyError /= 0) then
     Message = 'Unable to close ORDINT after CMOEDA.'
-    goto 900
+    exit reading
   end if
 
-  if (EDA_Is_Parallel()) then
+  if (IsParallel) then
     allocate(Totals(4+nFrag))
     Totals(1) = Jraw
     Totals(2) = Kraw
@@ -237,14 +263,18 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
 
   ierr = 0
   Message = ''
+  exit reading
+  end do reading
 
-900 continue
   CloseRC = 0
   if (Opened) then
     call ClsOrd(CloseRC)
     Opened = .false.
   end if
-  if (EDA_Any(CloseRC /= 0)) then
+  AnyError = 0
+  if (CloseRC /= 0) AnyError = 1
+  if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
+  if (AnyError /= 0) then
     ierr = 1
     if (len_trim(Message) == 0) Message = 'Unable to close ORDINT after CMOEDA.'
   end if
@@ -266,23 +296,5 @@ contains
   end function ExchangeMultiplicity
 
 end subroutine EDA_TwoElectron_Energies
-
-subroutine UnpackSymmetric(P,A,n)
-
-  integer(kind=iwp), intent(in) :: n
-  real(kind=wp), intent(in) :: P(:)
-  real(kind=wp), intent(out) :: A(n,n)
-  integer(kind=iwp) :: i,j,q
-
-  q = 0
-  do i=1,n
-    do j=1,i
-      q = q+1
-      A(i,j) = P(q)
-      A(j,i) = P(q)
-    end do
-  end do
-
-end subroutine UnpackSymmetric
 
 end module EDA_Integrals
