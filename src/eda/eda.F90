@@ -25,7 +25,7 @@ implicit none
 #include "warnings.h"
 
 integer(kind=iwp), intent(out) :: iReturn
-integer(kind=iwp) :: ierr, iFrag, nAtomsExpected, AnyError
+integer(kind=iwp) :: ierr, iFrag, nAtomsExpected, AnyError, iPass
 character(len=256) :: Message
 type(EDA_Reference_Type) :: Super
 type(EDA_Reference_Type), allocatable :: Frag(:)
@@ -44,7 +44,7 @@ if (AnyError /= 0) then
   return
 end if
 
-processing: do
+processing: do iPass=1,1
 
 allocate(Frag(EDA_nFrag))
 
@@ -98,7 +98,6 @@ if (ierr /= 0) exit processing
 if (IsRoot) call PrintResults(Super,Frag,EDA_nFrag,Results)
 
 iReturn = _RC_ALL_IS_WELL_
-exit processing
 end do processing
 
 if (ierr /= 0) then

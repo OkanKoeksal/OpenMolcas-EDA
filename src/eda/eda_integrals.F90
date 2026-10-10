@@ -119,7 +119,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   integer(kind=iwp), intent(out) :: ierr
   character(len=*), intent(out) :: Message
 
-  integer(kind=iwp) :: nPair, rc, CloseRC, LuOrd, AnyError
+  integer(kind=iwp) :: nPair, rc, CloseRC, LuOrd, AnyError, iPass
   integer(kind=iwp) :: FileNSym, FileBas(8), FileSkip(8)
   integer(kind=iwp) :: i,j,k,l,q,nMat,iOpt,iFrag
   integer(kind=iwp) :: mij,mkl
@@ -153,7 +153,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   end if
 
   allocate(Buf(nPair+1))
-  reading: do
+  reading: do iPass=1,1
 
   call OpnOrd(rc,0,'ORDINT',LuOrd)
   if (rc == 0) Opened = .true.
@@ -263,7 +263,6 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
 
   ierr = 0
   Message = ''
-  exit reading
   end do reading
 
   CloseRC = 0

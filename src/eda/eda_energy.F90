@@ -53,7 +53,7 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
 
   integer(kind=iwp) :: nBas,nOcc,nOccSum,nBasSum
   integer(kind=iwp) :: iFrag, i0, i1, mu, nu, p
-  integer(kind=iwp) :: info, lWork
+  integer(kind=iwp) :: info, lWork, iPass
   real(kind=wp) :: Enuc,OneRaw,OneOrth,Jraw,Kraw,Jorth,Korth
   real(kind=wp) :: SumEHF,SumEMP2,OverlapMin
   real(kind=wp), allocatable :: H(:,:),S(:,:),C(:,:),Tmp(:,:),OccS(:,:),Eig(:),Work(:),InvOccS(:,:)
@@ -117,7 +117,7 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
   allocate(OccS(nOcc,nOcc),Eig(nOcc),InvOccS(nOcc,nOcc))
   allocate(Praw(nBas,nBas),Porth(nBas,nBas),Pfrag(nBas,nBas,nFrag),Kfrag(nFrag))
 
-  processing: do
+  processing: do iPass=1,1
 
   call EDA_Read_OneElectron(nBas,H,S,Enuc,ierr,Message)
   if (ierr /= 0) exit processing
@@ -240,7 +240,6 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
 
   ierr = 0
   Message = ''
-  exit processing
   end do processing
 
   if (allocated(H)) deallocate(H)
