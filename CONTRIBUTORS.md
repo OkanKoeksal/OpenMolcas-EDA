@@ -124,6 +124,7 @@ Erik Källman
 Gunnar Karlström  
 Stefan Knecht  
 Vladislav Kochetov  
+Okan Koeksal  
 Jesper Wisborg Krogh  
 Teodoro Laino  
 Dong Q. Le  
