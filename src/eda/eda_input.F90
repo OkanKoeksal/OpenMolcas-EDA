@@ -14,15 +14,16 @@
 subroutine EDA_Read_Input(iReturn)
 
 use Definitions, only: iwp, u5, u6
-use EDA_Data, only: EDA_MaxFrag, EDA_nFrag, EDA_nAtom, EDA_Charge, EDA_Mult, &
-                    EDA_RefMethod, EDA_FragBasis, EDA_Debug, EDA_Reset_Input
+use EDA_Data, only: EDA_nFrag, EDA_nAtom, EDA_Charge, EDA_Mult, &
+                    EDA_RefMethod, EDA_FragBasis, EDA_Debug, EDA_Reset_Input, &
+                    EDA_Allocate_Fragments
 use Para_Info, only: nProcs, MyRank, Is_Real_Par
 
 implicit none
 #include "warnings.h"
 
 integer(kind=iwp), intent(out) :: iReturn
-integer(kind=iwp) :: i
+integer(kind=iwp) :: i, AllocError
 character(len=180) :: Line, Value
 character(len=180), external :: Get_Ln
 logical :: IsRoot
@@ -45,14 +46,18 @@ read_loop: do
     case ('NFRA')
       Line = Get_Ln(u5)
       call Get_I1(1,EDA_nFrag)
-      if ((EDA_nFrag < 1) .or. (EDA_nFrag > EDA_MaxFrag)) then
-        if (IsRoot) write(u6,'(6X,A,I0,A,I0,A)') 'EDA: NFRAG must be between 1 and ',EDA_MaxFrag, &
-                                     '; received ',EDA_nFrag,'.'
+      if (EDA_nFrag < 1) then
+        if (IsRoot) write(u6,'(6X,A,I0,A)') 'EDA: NFRAG must be positive; received ',EDA_nFrag,'.'
+        return
+      end if
+      call EDA_Allocate_Fragments(EDA_nFrag,AllocError)
+      if (AllocError /= 0) then
+        if (IsRoot) write(u6,'(6X,A,I0,A)') 'EDA: unable to allocate fragment data for NFRAG=',EDA_nFrag,'.'
         return
       end if
 
     case ('NATO')
-      if (EDA_nFrag < 1) then
+      if ((EDA_nFrag < 1) .or. (.not. allocated(EDA_nAtom))) then
         if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG must appear before NATOM.'
         return
       end if
@@ -60,7 +65,7 @@ read_loop: do
       call Get_I(1,EDA_nAtom,EDA_nFrag)
 
     case ('CHAR')
-      if (EDA_nFrag < 1) then
+      if ((EDA_nFrag < 1) .or. (.not. allocated(EDA_Charge))) then
         if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG must appear before CHARGE.'
         return
       end if
@@ -68,7 +73,7 @@ read_loop: do
       call Get_I(1,EDA_Charge,EDA_nFrag)
 
     case ('MULT')
-      if (EDA_nFrag < 1) then
+      if ((EDA_nFrag < 1) .or. (.not. allocated(EDA_Mult))) then
         if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG must appear before MULT.'
         return
       end if
@@ -104,16 +109,17 @@ read_loop: do
   end select
 end do read_loop
 
-if (EDA_nFrag < 1) then
+if ((EDA_nFrag < 1) .or. (.not. allocated(EDA_nAtom)) .or. &
+    (.not. allocated(EDA_Charge)) .or. (.not. allocated(EDA_Mult))) then
   if (IsRoot) write(u6,'(6X,A)') 'EDA: NFRAG is required.'
   return
 end if
-if (any(EDA_nAtom(1:EDA_nFrag) <= 0)) then
+if (any(EDA_nAtom <= 0)) then
   if (IsRoot) write(u6,'(6X,A)') 'EDA: NATOM must contain a positive atom count for every fragment.'
   return
 end if
-if (any(EDA_Mult(1:EDA_nFrag) /= 1)) then
-  if (IsRoot) write(u6,'(6X,A)') 'CMOEDA currently supports only closed-shell singlet fragments (MULT=1).'
+if (any(EDA_Mult /= 1)) then
+  if (IsRoot) write(u6,'(6X,A)') 'EDA currently supports only closed-shell singlet fragments (MULT=1).'
   return
 end if
 
@@ -131,9 +137,10 @@ end if
 if (EDA_Debug .and. IsRoot) then
   write(u6,'(/,6X,A)') 'EDA input summary:'
   write(u6,'(8X,A,I0)') 'Number of fragments: ',EDA_nFrag
-  write(u6,'(8X,A,10(I0,1X))') 'Atoms per fragment: ',(EDA_nAtom(i),i=1,EDA_nFrag)
-  write(u6,'(8X,A,10(I0,1X))') 'Fragment charges:   ',(EDA_Charge(i),i=1,EDA_nFrag)
-  write(u6,'(8X,A,10(I0,1X))') 'Multiplicities:     ',(EDA_Mult(i),i=1,EDA_nFrag)
+  do i=1,EDA_nFrag
+    write(u6,'(8X,A,I0,A,I0,A,I0,A,I0)') 'Fragment ',i,': NATOM=',EDA_nAtom(i), &
+                                          ' CHARGE=',EDA_Charge(i),' MULT=',EDA_Mult(i)
+  end do
   write(u6,'(8X,2A)') 'Reference: ',trim(EDA_RefMethod)
   write(u6,'(8X,2A)') 'Fragment basis: ',trim(EDA_FragBasis)
 end if

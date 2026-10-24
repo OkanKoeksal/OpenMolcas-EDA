@@ -18,30 +18,52 @@ use Definitions, only: iwp
 implicit none
 private
 
-integer, parameter, public :: EDA_MaxFrag = 10
-
 integer(kind=iwp), public :: EDA_nFrag = 0
-integer(kind=iwp), public :: EDA_nAtom(EDA_MaxFrag) = 0
-integer(kind=iwp), public :: EDA_Charge(EDA_MaxFrag) = 0
-integer(kind=iwp), public :: EDA_Mult(EDA_MaxFrag) = 1
+integer(kind=iwp), allocatable, public :: EDA_nAtom(:)
+integer(kind=iwp), allocatable, public :: EDA_Charge(:)
+integer(kind=iwp), allocatable, public :: EDA_Mult(:)
 character(len=8), public :: EDA_RefMethod = 'AUTO    '
 character(len=8), public :: EDA_FragBasis = 'OWN     '
 logical, public :: EDA_Debug = .false.
 
-public :: EDA_Reset_Input
+public :: EDA_Reset_Input, EDA_Allocate_Fragments
 
 contains
 
 subroutine EDA_Reset_Input()
 
+  if (allocated(EDA_nAtom)) deallocate(EDA_nAtom)
+  if (allocated(EDA_Charge)) deallocate(EDA_Charge)
+  if (allocated(EDA_Mult)) deallocate(EDA_Mult)
+
   EDA_nFrag = 0
-  EDA_nAtom(:) = 0
-  EDA_Charge(:) = 0
-  EDA_Mult(:) = 1
   EDA_RefMethod = 'AUTO    '
   EDA_FragBasis = 'OWN     '
   EDA_Debug = .false.
 
 end subroutine EDA_Reset_Input
+
+subroutine EDA_Allocate_Fragments(nFrag,ierr)
+
+  integer(kind=iwp), intent(in) :: nFrag
+  integer(kind=iwp), intent(out) :: ierr
+  integer :: AllocStat
+
+  ierr = 1
+  if (nFrag < 1) return
+
+  if (allocated(EDA_nAtom)) deallocate(EDA_nAtom)
+  if (allocated(EDA_Charge)) deallocate(EDA_Charge)
+  if (allocated(EDA_Mult)) deallocate(EDA_Mult)
+
+  allocate(EDA_nAtom(nFrag),EDA_Charge(nFrag),EDA_Mult(nFrag),stat=AllocStat)
+  if (AllocStat /= 0) return
+
+  EDA_nAtom(:) = 0
+  EDA_Charge(:) = 0
+  EDA_Mult(:) = 1
+  ierr = 0
+
+end subroutine EDA_Allocate_Fragments
 
 end module EDA_Data

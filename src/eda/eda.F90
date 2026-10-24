@@ -26,6 +26,7 @@ implicit none
 
 integer(kind=iwp), intent(out) :: iReturn
 integer(kind=iwp) :: ierr, iFrag, nAtomsExpected, AnyError, iPass
+integer :: AllocStat
 character(len=256) :: Message
 type(EDA_Reference_Type) :: Super
 type(EDA_Reference_Type), allocatable :: Frag(:)
@@ -46,7 +47,12 @@ end if
 
 processing: do iPass=1,1
 
-allocate(Frag(EDA_nFrag))
+allocate(Frag(EDA_nFrag),stat=AllocStat)
+if (AllocStat /= 0) then
+  Message = 'Unable to allocate EDA fragment reference data.'
+  ierr = 1
+  exit processing
+end if
 
 call EDA_Read_Super(Super,ierr,Message)
 call EDA_Sync_Error(ierr,Message)
@@ -101,14 +107,16 @@ iReturn = _RC_ALL_IS_WELL_
 end do processing
 
 if (ierr /= 0) then
-  if (IsRoot) write(u6,'(/,6X,2A)') 'CMOEDA failed: ',trim(Message)
+  if (IsRoot) write(u6,'(/,6X,2A)') 'EDA failed: ',trim(Message)
   iReturn = _RC_GENERAL_ERROR_
 end if
 call EDA_Free_Reference(Super)
-do iFrag=1,size(Frag)
-  call EDA_Free_Reference(Frag(iFrag))
-end do
-if (allocated(Frag)) deallocate(Frag)
+if (allocated(Frag)) then
+  do iFrag=1,size(Frag)
+    call EDA_Free_Reference(Frag(iFrag))
+  end do
+  deallocate(Frag)
+end if
 
 contains
 
@@ -127,7 +135,7 @@ subroutine PrintResults(SuperRef,FragRef,nFrag,Res)
   end do
 
   write(u6,'(/,6X,A)') '=============================================================='
-  write(u6,'(6X,A)')   '  Closed-shell CMOEDA'
+  write(u6,'(6X,A)')   '  Closed-shell EDA'
   write(u6,'(6X,A)')   '=============================================================='
   write(u6,'(6X,A,1X,A)') 'Reference method:',trim(EDA_RefMethod)
   write(u6,'(6X,A,1X,A)') 'Fragment basis convention:',trim(EDA_FragBasis)
@@ -137,38 +145,38 @@ subroutine PrintResults(SuperRef,FragRef,nFrag,Res)
   write(u6,'(6X,A,F20.10,A)') 'Sum of fragment RHF energies:',SumEHF,' a.u.'
   write(u6,'(6X,A,F20.10,A)') 'Supermolecule RHF energy:   ',SuperRef%EHF,' a.u.'
   write(u6,'(/,6X,A)') 'Intermediate frozen-fragment energies'
-  write(u6,'(8X,A,T54,F20.10)') 'E(0): non-antisymmetric, non-orthogonal',Res%E0
-  write(u6,'(8X,A,T54,F20.10)') 'E(1): antisymmetric, non-orthogonal    ',Res%E1
-  write(u6,'(8X,A,T54,F20.10)') 'E(2): antisymmetric, orthogonalized    ',Res%E2
+  write(u6,'(8X,A,T54,F20.10)') 'E_X^(1): non-antisymmetric, non-orthogonal',Res%EX1
+  write(u6,'(8X,A,T54,F20.10)') 'E_X^(2): antisymmetric, non-orthogonal    ',Res%EX2
+  write(u6,'(8X,A,T54,F20.10)') 'E_X^(3): antisymmetric, orthogonalized    ',Res%EX3
 
-  write(u6,'(/,6X,A)') 'CMOEDA interaction-energy decomposition'
+  write(u6,'(/,6X,A)') 'EDA interaction-energy decomposition'
   write(u6,'(6X,A,T43,A,T61,A)') 'Component','Hartree','kcal/mol'
-  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Electrostatic',Res%Electrostatic,Res%Electrostatic*auTokcalmol
-  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Exchange',Res%Exchange,Res%Exchange*auTokcalmol
-  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Repulsion',Res%Repulsion,Res%Repulsion*auTokcalmol
-  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Polarization',Res%Polarization,Res%Polarization*auTokcalmol
-  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'HF interaction',Res%HFInteraction,Res%HFInteraction*auTokcalmol
+  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Electrostatic',Res%DeltaEele,Res%DeltaEele*auTokcalmol
+  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Exchange',Res%DeltaEex,Res%DeltaEex*auTokcalmol
+  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Repulsion',Res%DeltaErep,Res%DeltaErep*auTokcalmol
+  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'Polarization',Res%DeltaEpol,Res%DeltaEpol*auTokcalmol
+  write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'HF interaction',Res%DeltaEHF,Res%DeltaEHF*auTokcalmol
   if (Res%HasMP2) then
-    write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'MP2 dispersion',Res%Dispersion,Res%Dispersion*auTokcalmol
-    write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'MP2 interaction',Res%MP2Interaction,Res%MP2Interaction*auTokcalmol
+    write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'MP2 dispersion',Res%DeltaEdisp,Res%DeltaEdisp*auTokcalmol
+    write(u6,'(6X,A,T43,F16.8,T61,F16.4)') 'MP2 interaction',Res%DeltaEMP2,Res%DeltaEMP2*auTokcalmol
   end if
   write(u6,'(6X,A,T43,ES16.6)') 'HF closure residual',Res%Closure
   write(u6,'(6X,A/)') '=============================================================='
 
-  ! Export the CMOEDA quantities to the OpenMolcas verification system.
+  ! Export the EDA quantities to the OpenMolcas verification system.
   ! A tolerance of 1.0e-7 Eh is tight enough to detect numerical
   ! regressions while allowing harmless changes in summation order.
-  call Add_Info('CMOEDA_E0',[Res%E0],1,7)
-  call Add_Info('CMOEDA_E1',[Res%E1],1,7)
-  call Add_Info('CMOEDA_E2',[Res%E2],1,7)
-  call Add_Info('CMOEDA_ELECTROSTATIC',[Res%Electrostatic],1,7)
-  call Add_Info('CMOEDA_EXCHANGE',[Res%Exchange],1,7)
-  call Add_Info('CMOEDA_REPULSION',[Res%Repulsion],1,7)
-  call Add_Info('CMOEDA_POLARIZATION',[Res%Polarization],1,7)
-  call Add_Info('CMOEDA_HF_INTERACTION',[Res%HFInteraction],1,7)
+  call Add_Info('EDA_EX1',[Res%EX1],1,7)
+  call Add_Info('EDA_EX2',[Res%EX2],1,7)
+  call Add_Info('EDA_EX3',[Res%EX3],1,7)
+  call Add_Info('EDA_ELECTROSTATIC',[Res%DeltaEele],1,7)
+  call Add_Info('EDA_EXCHANGE',[Res%DeltaEex],1,7)
+  call Add_Info('EDA_REPULSION',[Res%DeltaErep],1,7)
+  call Add_Info('EDA_POLARIZATION',[Res%DeltaEpol],1,7)
+  call Add_Info('EDA_HF_INTERACTION',[Res%DeltaEHF],1,7)
   if (Res%HasMP2) then
-    call Add_Info('CMOEDA_MP2_DISPERSION',[Res%Dispersion],1,7)
-    call Add_Info('CMOEDA_MP2_INTERACTION',[Res%MP2Interaction],1,7)
+    call Add_Info('EDA_MP2_DISPERSION',[Res%DeltaEdisp],1,7)
+    call Add_Info('EDA_MP2_INTERACTION',[Res%DeltaEMP2],1,7)
   end if
 
 end subroutine PrintResults

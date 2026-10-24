@@ -35,9 +35,9 @@ subroutine EDA_Sync_Error(Code,Message)
   if (FailedHere) AnyError = 1
   if ((nProcs > 1) .and. Is_Real_Par()) call gaIgOP_SCAL(AnyError,'max')
   if (AnyError /= 0) then
-    if (FailedHere) write(u6,'(A,I6,2A)') ' CMOEDA rank ',MyRank,': ',trim(Message)
+    if (FailedHere) write(u6,'(A,I6,2A)') ' EDA rank ',MyRank,': ',trim(Message)
     Code = 1
-    if (.not. FailedHere) Message = 'CMOEDA failed on another MPI rank: inspect rank diagnostics.'
+    if (.not. FailedHere) Message = 'EDA failed on another MPI rank: inspect rank diagnostics.'
   end if
 
 end subroutine EDA_Sync_Error

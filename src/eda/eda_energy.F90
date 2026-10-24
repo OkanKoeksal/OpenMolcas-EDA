@@ -24,17 +24,22 @@ private
 
 public :: EDA_Results_Type, EDA_Compute_ClosedShell
 
+! P. Su and H. Li, J. Chem. Phys. 131, 014102 (2009),
+! DOI: 10.1063/1.3159673.
+! Paper notation used below:
+!   EX1 = E_X^(1), EX2 = E_X^(2), EX3 = E_X^(3)
+!   DeltaEele, DeltaEex, DeltaErep, DeltaEpol, DeltaEHF, DeltaEdisp.
 type :: EDA_Results_Type
-  real(kind=wp) :: E0 = Zero
-  real(kind=wp) :: E1 = Zero
-  real(kind=wp) :: E2 = Zero
-  real(kind=wp) :: Electrostatic = Zero
-  real(kind=wp) :: Exchange = Zero
-  real(kind=wp) :: Repulsion = Zero
-  real(kind=wp) :: Polarization = Zero
-  real(kind=wp) :: HFInteraction = Zero
-  real(kind=wp) :: Dispersion = Zero
-  real(kind=wp) :: MP2Interaction = Zero
+  real(kind=wp) :: EX1 = Zero
+  real(kind=wp) :: EX2 = Zero
+  real(kind=wp) :: EX3 = Zero
+  real(kind=wp) :: DeltaEele = Zero
+  real(kind=wp) :: DeltaEex = Zero
+  real(kind=wp) :: DeltaErep = Zero
+  real(kind=wp) :: DeltaEpol = Zero
+  real(kind=wp) :: DeltaEHF = Zero
+  real(kind=wp) :: DeltaEdisp = Zero
+  real(kind=wp) :: DeltaEMP2 = Zero
   real(kind=wp) :: Closure = Zero
   logical :: HasMP2 = .false.
 end type EDA_Results_Type
@@ -211,9 +216,9 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
   call EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag,Jraw,Kraw,Jorth,Korth,Kfrag,ierr,Message)
   if (ierr /= 0) exit processing
 
-  Results%E0 = OneRaw + 0.5_wp*Jraw - 0.25_wp*sum(Kfrag) + Enuc
-  Results%E1 = OneRaw + 0.5_wp*Jraw - 0.25_wp*Kraw + Enuc
-  Results%E2 = OneOrth + 0.5_wp*Jorth - 0.25_wp*Korth + Enuc
+  Results%EX1 = OneRaw + 0.5_wp*Jraw - 0.25_wp*sum(Kfrag) + Enuc
+  Results%EX2 = OneRaw + 0.5_wp*Jraw - 0.25_wp*Kraw + Enuc
+  Results%EX3 = OneOrth + 0.5_wp*Jorth - 0.25_wp*Korth + Enuc
 
   SumEHF = Zero
   SumEMP2 = Zero
@@ -224,18 +229,18 @@ subroutine EDA_Compute_ClosedShell(Super,Frag,nFrag,FragBasis,Results,ierr,Messa
     AllMP2 = AllMP2 .and. Frag(iFrag)%HasMP2
   end do
 
-  Results%Electrostatic = Results%E0 - SumEHF
-  Results%Exchange = Results%E1 - Results%E0
-  Results%Repulsion = Results%E2 - Results%E1
-  Results%Polarization = Super%EHF - Results%E2
-  Results%HFInteraction = Super%EHF - SumEHF
-  Results%Closure = Results%HFInteraction - (Results%Electrostatic + Results%Exchange + &
-                    Results%Repulsion + Results%Polarization)
+  Results%DeltaEele = Results%EX1 - SumEHF
+  Results%DeltaEex = Results%EX2 - Results%EX1
+  Results%DeltaErep = Results%EX3 - Results%EX2
+  Results%DeltaEpol = Super%EHF - Results%EX3
+  Results%DeltaEHF = Super%EHF - SumEHF
+  Results%Closure = Results%DeltaEHF - (Results%DeltaEele + Results%DeltaEex + &
+                    Results%DeltaErep + Results%DeltaEpol)
 
   Results%HasMP2 = AllMP2
   if (AllMP2) then
-    Results%MP2Interaction = Super%ETotal - SumEMP2
-    Results%Dispersion = Results%MP2Interaction - Results%HFInteraction
+    Results%DeltaEMP2 = Super%ETotal - SumEMP2
+    Results%DeltaEdisp = Results%DeltaEMP2 - Results%DeltaEHF
   end if
 
   ierr = 0

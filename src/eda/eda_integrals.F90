@@ -93,7 +93,7 @@ subroutine EDA_Read_OneElectron(nBas,H,S,Enuc,ierr,Message)
   if (AnyError /= 0) then
     ierr = 1
     if (Failed) then
-      Message = 'Unable to read ONEINT for CMOEDA.'
+      Message = 'Unable to read ONEINT for EDA.'
     else
       Message = 'ONEINT reading failed on another MPI rank.'
     end if
@@ -131,7 +131,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   IsParallel = (nProcs > 1) .and. Is_Real_Par()
 
   ierr = 1
-  Message = 'Unable to read conventional two-electron integrals for CMOEDA.'
+  Message = 'Unable to read conventional two-electron integrals for EDA.'
   Jraw = Zero
   Kraw = Zero
   Jorth = Zero
@@ -148,7 +148,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   if (.not. logical(Exists)) AnyError = 1
   if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
   if (AnyError /= 0) then
-    Message = 'CMOEDA requires stored ORDINT integrals: use &SEWARD with NoCholesky.'
+    Message = 'EDA requires stored ORDINT integrals: use &SEWARD with NoCholesky.'
     return
   end if
 
@@ -161,7 +161,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   if (rc /= 0) AnyError = 1
   if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
   if (AnyError /= 0) then
-    Message = 'Unable to open conventional ORDINT integrals for CMOEDA.'
+    Message = 'Unable to open conventional ORDINT integrals for EDA.'
     exit reading
   end if
 
@@ -172,12 +172,12 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   if (Failed) AnyError = 1
   if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
   if (AnyError /= 0) then
-    Message = 'ORDINT dimensions do not match the C1 CMOEDA supermolecule reference.'
+    Message = 'ORDINT dimensions do not match the C1 EDA supermolecule reference.'
     exit reading
   end if
 
   ! In a real MPI run ORDINT is distributed over the ranks.  Unlike an
-  ! AO->MO transformation, each CMOEDA J/K quantity is a linear functional
+  ! AO->MO transformation, each EDA J/K quantity is a linear functional
   ! of the AO integrals.  It is therefore sufficient for every rank to
   ! contract its local ORDINT contribution and globally sum only the final
   ! scalar energies.  No reconstruction of complete AO rows is required.
@@ -194,7 +194,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
       if (Failed) AnyError = 1
       if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
       if (AnyError /= 0) then
-        Message = 'Failed to read a complete conventional ORDINT pair row for CMOEDA.'
+        Message = 'Failed to read a complete conventional ORDINT pair row for EDA.'
         exit reading
       end if
 
@@ -241,7 +241,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   if (rc /= 0) AnyError = 1
   if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
   if (AnyError /= 0) then
-    Message = 'Unable to close ORDINT after CMOEDA.'
+    Message = 'Unable to close ORDINT after EDA.'
     exit reading
   end if
 
@@ -275,7 +275,7 @@ subroutine EDA_TwoElectron_Energies(nBas,nFrag,Praw,Porth,Pfrag, &
   if (IsParallel) call gaIgOP_SCAL(AnyError,'max')
   if (AnyError /= 0) then
     ierr = 1
-    if (len_trim(Message) == 0) Message = 'Unable to close ORDINT after CMOEDA.'
+    if (len_trim(Message) == 0) Message = 'Unable to close ORDINT after EDA.'
   end if
   if (allocated(Buf)) deallocate(Buf)
   if (allocated(Totals)) deallocate(Totals)

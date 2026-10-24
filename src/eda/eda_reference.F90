@@ -19,10 +19,6 @@ use Constants, only: Zero
 implicit none
 private
 
-character(len=8), parameter :: FragRunName(10) = [ &
-  'EDAFRG1 ', 'EDAFRG2 ', 'EDAFRG3 ', 'EDAFRG4 ', 'EDAFRG5 ', &
-  'EDAFRG6 ', 'EDAFRG7 ', 'EDAFRG8 ', 'EDAFRG9 ', 'EDAFR10 ' ]
-
 type, public :: EDA_Reference_Type
   integer(kind=iwp) :: nBas = 0
   integer(kind=iwp) :: nOrb = 0
@@ -56,26 +52,69 @@ subroutine EDA_Read_Fragment(iFrag,Ref,ierr,Message)
   integer(kind=iwp), intent(out) :: ierr
   character(len=*), intent(out) :: Message
   logical(kind=iwp) :: Exists
+  character(len=8) :: RunName
 
   ierr = 1
   Message = ''
 
-  if ((iFrag < 1) .or. (iFrag > size(FragRunName))) then
-    Message = 'EDA fragment index is outside the supported range.'
+  if (iFrag < 1) then
+    Message = 'EDA fragment index must be positive.'
     return
   end if
 
-  call f_Inquire(trim(FragRunName(iFrag)),Exists)
+  call Fragment_RunName(iFrag,RunName,ierr)
+  if (ierr /= 0) then
+    Message = 'Unable to encode the EDA fragment RunFile name.'
+    return
+  end if
+
+  call f_Inquire(trim(RunName),Exists)
   if (.not. Exists) then
-    write(Message,'(A,I0,A)') 'Missing EDA fragment RunFile ',iFrag,'.'
+    write(Message,'(A,I0,2A)') 'Missing EDA fragment RunFile ',iFrag,' (alias ',trim(RunName)//').'
     return
   end if
 
-  call NameRun(trim(FragRunName(iFrag)))
+  call NameRun(trim(RunName))
   call Read_Current_RunFile(Ref,ierr,Message)
   call NameRun('#Pop')
 
 end subroutine EDA_Read_Fragment
+
+subroutine Fragment_RunName(iFrag,RunName,ierr)
+
+  integer(kind=iwp), intent(in) :: iFrag
+  character(len=8), intent(out) :: RunName
+  integer(kind=iwp), intent(out) :: ierr
+  integer(kind=iwp) :: Value
+  integer :: Pos, Digit
+  character(len=*), parameter :: Digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+  RunName = '        '
+  ierr = 0
+
+  ! Preserve the historical aliases for ordinary fragment counts.
+  if (iFrag <= 9) then
+    write(RunName,'("EDAFRG",I1)') iFrag
+    return
+  else if (iFrag <= 999) then
+    write(RunName,'("EDAFR",I0)') iFrag
+    return
+  end if
+
+  ! For larger counts, encode the positive fragment index in base 36.
+  ! Six base-36 digits with the two-character prefix "EF" cover more
+  ! than two billion fragment indices while keeping an eight-character
+  ! RunFile alias.  This is far beyond any physically feasible EDA job.
+  Value = iFrag
+  RunName(1:2) = 'EF'
+  do Pos=8,3,-1
+    Digit = int(mod(Value,36_iwp))
+    RunName(Pos:Pos) = Digits(Digit+1:Digit+1)
+    Value = Value/36_iwp
+  end do
+  if (Value /= 0) ierr = 1
+
+end subroutine Fragment_RunName
 
 subroutine Read_Current_RunFile(Ref,ierr,Message)
 
@@ -94,7 +133,7 @@ subroutine Read_Current_RunFile(Ref,ierr,Message)
 
   call Get_iScalar('nSym',nSym)
   if (nSym /= 1) then
-    Message = 'CMOEDA currently requires C1 (NoSym) references.'
+    Message = 'EDA currently requires C1 (NoSym) references.'
     return
   end if
 
@@ -114,7 +153,7 @@ subroutine Read_Current_RunFile(Ref,ierr,Message)
   end if
 
   if ((Ref%Method(1:7) /= 'RHF-SCF') .and. (Ref%Method(1:5) /= 'MBPT2')) then
-    Message = 'CMOEDA currently accepts only RHF-SCF or closed-shell MBPT2 references.'
+    Message = 'EDA currently accepts only RHF-SCF or closed-shell MBPT2 references.'
     return
   end if
 
